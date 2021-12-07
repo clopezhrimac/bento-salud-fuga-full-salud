@@ -1,0 +1,44 @@
+steps:
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        mkdir -p artifacts/ \
+        && gsutil cp gs://$_BUCKET_NAME/tmp/per_fuga_amifullsalud_cls/model.pkl ./artifacts \
+        && gsutil cp gs://$_BUCKET_NAME/tmp/per_fuga_amifullsalud_cls/preprocess.pkl ./artifacts \
+        && ls -lrta
+
+  - name: python:3.7
+    entrypoint: pip
+    args: [ 'install', '-r', './requirements.txt', '--user' ]
+
+  - name: python:3.7
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        mkdir -p ./packs \
+        && python ./bento_packer.py
+
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        ls -lrta \
+        && cd ./packs \
+        && docker build -t gcr.io/$PROJECT_ID/bento-salud-fuga-full-salud:latest . \
+        && docker push gcr.io/$PROJECT_ID/bento-salud-fuga-full-salud:latest
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: sh
+    args:
+      - '-c'
+      - |
+        gcloud run deploy bento-salud-fuga-full-salud --image gcr.io/$PROJECT_ID/bento-salud-fuga-full-salud:latest --region us-central1 --platform managed
+
+substitutions:
+  _BUCKET_NAME: ue4_ndlk_nonprod_stg_gcs_iadev_artfsto
+
+timeout: 900s
